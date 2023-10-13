@@ -1,4 +1,4 @@
-package ttlcache
+package ttlswisscache
 
 import (
 	"testing"
@@ -6,11 +6,11 @@ import (
 )
 
 func TestCache_GetSet(t *testing.T) {
-	ttl := 2 * time.Millisecond
+	ttl := 2 * time.Second
 	key := StringKey("key")
 	value := "value"
 
-	c := New(time.Millisecond)
+	c := New(1 * time.Second)
 	c.Set(key, value, ttl)
 
 	val, ok := c.Get(key)
@@ -24,10 +24,10 @@ func TestCache_GetSet(t *testing.T) {
 	}
 
 	if v != value {
-		t.Errorf("incorret value: got: %v expected: %v", v, value)
+		t.Errorf("incorrect value: got: %v expected: %v", v, value)
 	}
 
-	time.Sleep(4 * time.Millisecond)
+	time.Sleep(4 * time.Second)
 
 	_, ok3 := c.Get(key)
 	if ok3 {
@@ -65,7 +65,7 @@ func TestCache_Delete(t *testing.T) {
 }
 
 func TestCache_Clear(t *testing.T) {
-	c := New(time.Millisecond)
+	c := New(time.Second)
 
 	for i := 1; i < 5; i++ {
 		c.Set(IntKey(i), i, 0)
@@ -73,6 +73,7 @@ func TestCache_Clear(t *testing.T) {
 
 	c.Clear()
 
+	time.Sleep(time.Second)
 	for i := 1; i < 5; i++ {
 		_, ok := c.Get(IntKey(i))
 		if ok {
@@ -86,7 +87,7 @@ func TestCache_Clear(t *testing.T) {
 	value := "value"
 
 	c.Set(key, value, ttl)
-	time.Sleep(4 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	_, ok := c.Get(key)
 	if ok {

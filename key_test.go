@@ -1,4 +1,4 @@
-package ttlcache
+package ttlswisscache
 
 import (
 	"testing"

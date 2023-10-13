@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cheshir/ttlcache"
+	ttlcache "github.com/loicalleyne/ttlswisscache"
 )
 
 const (

@@ -1,17 +1,17 @@
-package ttlcache
+package ttlswisscache
 
 import (
-	"sync"
 	"time"
+
+	csmap "github.com/mhmtszr/concurrent-swiss-map"
 )
 
-const defaultCapacity = 16 // Just to avoid extra allocations in most of the cases.
+const defaultCapacity = 64 // Just to avoid extra allocations in most of the cases.
 
 // Cache represents key-value storage.
 type Cache struct {
 	done  chan struct{}
-	mu    sync.RWMutex
-	items map[uint64]item
+	items *csmap.CsMap[uint64, item]
 }
 
 type item struct {
@@ -23,9 +23,13 @@ type item struct {
 // resolution – configures cleanup manager.
 // Cleanup operation locks storage so think twice before setting it to small value.
 func New(resolution time.Duration) *Cache {
+	items := csmap.Create[uint64, item](
+		csmap.WithShardCount[uint64, item](32),
+		csmap.WithSize[uint64, item](defaultCapacity),
+	)
 	c := &Cache{
 		done:  make(chan struct{}),
-		items: make(map[uint64]item, defaultCapacity),
+		items: items,
 	}
 
 	go cleaner(c, resolution)
@@ -37,14 +41,10 @@ func New(resolution time.Duration) *Cache {
 // The first returned variable is a stored value.
 // The second one is an existence flag like in the map.
 func (c *Cache) Get(key uint64) (interface{}, bool) {
-	c.mu.RLock()
-	cacheItem, ok := c.items[key]
-	c.mu.RUnlock()
-
+	cacheItem, ok := c.items.Load(key)
 	if !ok {
 		return nil, false
 	}
-
 	return cacheItem.value, true
 }
 
@@ -55,34 +55,23 @@ func (c *Cache) Set(key uint64, value interface{}, ttl time.Duration) {
 		deadline: time.Now().UnixNano() + int64(ttl),
 		value:    value,
 	}
-
-	c.mu.Lock()
-	c.items[key] = cacheItem
-	c.mu.Unlock()
+	c.items.Store(key, cacheItem)
 }
 
 // Delete removes record from storage.
 func (c *Cache) Delete(key uint64) {
-	c.mu.Lock()
-	delete(c.items, key)
-	c.mu.Unlock()
+	c.items.Delete(key)
 }
 
 // Clear removes all items from storage and leaves the cleanup manager running.
 func (c *Cache) Clear() {
-	c.mu.Lock()
-	c.items = make(map[uint64]item, defaultCapacity)
-	c.mu.Unlock()
+	c.items.Clear()
 }
 
 // Close stops cleanup manager and removes records from storage.
 func (c *Cache) Close() error {
 	close(c.done)
-
-	c.mu.Lock()
-	c.items = nil
-	c.mu.Unlock()
-
+	c.items.Clear()
 	return nil
 }
 
@@ -90,15 +79,18 @@ func (c *Cache) Close() error {
 // It triggers stop the world for the cache.
 func (c *Cache) cleanup() {
 	now := time.Now().UnixNano()
-	c.mu.Lock()
-
-	for key, item := range c.items {
-		if item.deadline < now {
-			delete(c.items, key)
+	k := make([]uint64, c.items.Count())
+	i := 0
+	c.items.Range(func(key uint64, value item) (stop bool) {
+		if value.deadline < now {
+			k[i] = key
+			i++
 		}
+		return false
+	})
+	for _, d := range k {
+		c.items.Delete(d)
 	}
-
-	c.mu.Unlock()
 }
 
 func cleaner(c *Cache, resolution time.Duration) {

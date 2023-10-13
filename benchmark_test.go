@@ -1,4 +1,4 @@
-package ttlcache
+package ttlswisscache
 
 import (
 	"testing"
@@ -19,6 +19,10 @@ func BenchmarkCache_Set_10000(b *testing.B) {
 	benchmarkCacheSet(b, 10000)
 }
 
+func BenchmarkCache_Set_100000(b *testing.B) {
+	benchmarkCacheSet(b, 100000)
+}
+
 func BenchmarkCache_Get_100(b *testing.B) {
 	benchmarkCacheGet(b, 100)
 }
@@ -29,6 +33,10 @@ func BenchmarkCache_Get_1000(b *testing.B) {
 
 func BenchmarkCache_Get_10000(b *testing.B) {
 	benchmarkCacheGet(b, 10000)
+}
+
+func BenchmarkCache_Get_100000(b *testing.B) {
+	benchmarkCacheGet(b, 100000)
 }
 
 func benchmarkCacheSet(b *testing.B, numberOfKeys int) {
